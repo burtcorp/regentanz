@@ -1,0 +1,89 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'yaml'
+require 'aws-sdk-core'
+
+class TemplateCompiler
+  TemplateCompilerError = Class.new(StandardError)
+  ParseError = Class.new(TemplateCompilerError)
+  ValidationError = Class.new(TemplateCompilerError)
+
+  def initialize
+    @cf_client = Aws::CloudFormation::Client.new
+  end
+
+  def run(args)
+    stack_name = args.first
+    parameters = mappings = resources = nil
+    Dir.chdir(stack_name) do
+      parameters = load('parameters.json')
+      mappings = load('mappings.json')
+      resources = Dir['resources/**/*.{json,yml,yaml}'].each_with_object({}) do |path, acc|
+        relative_path = path.sub(/^resources\//, '')
+        acc[relative_path] = load(path)
+      end
+    end
+    template = JSON.pretty_generate(
+      'AWSTemplateFormatVersion' => '2010-09-09',
+      'Description' => stack_name,
+      'Parameters' => parameters,
+      'Mappings' => mappings,
+      'Resources' => compile_resources(resources)
+    )
+    validate_template(template)
+    puts(template)
+    0
+  rescue TemplateCompilerError => e
+    $stderr.puts(e.message)
+    1
+  end
+
+  def load(path)
+    YAML.load_file(path)
+  rescue Psych::SyntaxError => e
+    raise ParseError, sprintf('Invalid template fragment: %s', e.message), e.backtrace
+  end
+
+  def validate_template(template)
+    @cf_client.validate_template(template_body: template)
+  rescue Aws::CloudFormation::Errors::ValidationError => e
+    raise ValidationError, "Invalid template: #{e.message}", e.backtrace
+  end
+
+  def compile_resources(resources)
+    resources.each_with_object({}) do |(relative_path, resource), compiled_resources|
+      name = relative_path_to_name(relative_path)
+      compiled_resources[name] = expand_refs(resource)
+    end
+  end
+
+  def relative_path_to_name(relative_path)
+    name = relative_path.dup
+    name.sub!(/\.([^.]+)$/, '')
+    name.gsub!('/', '_')
+    name.gsub!(/_.|^./) { |str| str[-1].upcase }
+    name
+  end
+
+  def expand_refs(resource)
+    case resource
+    when Hash
+      if (reference = resource.delete('ResolveRef'))
+        resource['Ref'] = relative_path_to_name(reference)
+      else
+        resource.each_value do |v|
+          expand_refs(v)
+        end
+      end
+    when Array
+      resource.each do |v|
+        expand_refs(v)
+      end
+    end
+  end
+end
+
+if $0 == __FILE__
+  exit(TemplateCompiler.new.run(ARGV))
+end
