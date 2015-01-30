@@ -19,7 +19,7 @@ class TemplateCompiler
     Dir.chdir(stack_name) do
       parameters = load('parameters.json')
       mappings = load('mappings.json')
-      resources = Dir['resources/**/*.{json,yml,yaml}'].each_with_object({}) do |path, acc|
+      resources = Dir['resources/**/*.{json,yml,yaml}'].sort.each_with_object({}) do |path, acc|
         relative_path = path.sub(/^resources\//, '')
         acc[relative_path] = load(path)
       end
