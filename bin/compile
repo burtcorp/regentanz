@@ -14,9 +14,9 @@ class TemplateCompiler
   end
 
   def run(args)
-    stack_name = args.first
+    stack_path = args.first
     parameters = mappings = resources = nil
-    Dir.chdir(stack_name) do
+    Dir.chdir(stack_path) do
       parameters = load('parameters.json')
       mappings = load('mappings.json')
       resources = Dir['resources/**/*.{json,yml,yaml}'].sort.each_with_object({}) do |path, acc|
@@ -26,7 +26,6 @@ class TemplateCompiler
     end
     template = JSON.pretty_generate(
       'AWSTemplateFormatVersion' => '2010-09-09',
-      'Description' => stack_name,
       'Parameters' => parameters,
       'Mappings' => mappings,
       'Resources' => compile_resources(resources)
