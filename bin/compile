@@ -1,120 +1,26 @@
 #!/usr/bin/env ruby
 
-require 'json'
-require 'yaml'
-require 'aws-sdk-core'
+$LOAD_PATH << File.expand_path('../../lib', __FILE__)
+require 'regentanz'
 
-class TemplateCompiler
-  TemplateCompilerError = Class.new(StandardError)
-  ParseError = Class.new(TemplateCompilerError)
-  ValidationError = Class.new(TemplateCompilerError)
-  AmbiguityError = Class.new(TemplateCompilerError)
-
+class Main
   def initialize
-    @cf_client = Aws::CloudFormation::Client.new
+    @compiler = Regentanz::TemplateCompiler.new
   end
 
   def run(args)
     stack_path = args.first
-    parameters = mappings = resources = nil
-    Dir.chdir(stack_path) do
-      parameters = load_parameters
-      mappings = load_mappings
-      resources = load_resources
-    end
-    template = compile_template(parameters, mappings, resources)
+    template = @compiler.compile_from_path(stack_path)
     template_json = JSON.pretty_generate(template)
-    validate_template(template_json)
+    @compiler.validate_template(template_json)
     puts(template_json)
     0
-  rescue TemplateCompilerError => e
+  rescue Regentanz::Error => e
     $stderr.puts(e.message)
     1
-  end
-
-  private
-
-  def load_parameters
-    load_top_level_file('parameters')
-  end
-
-  def load_mappings
-    load_top_level_file('mappings')
-  end
-
-  def load_top_level_file(name)
-    matches = Dir["#{name}.{json,yml,yaml}"]
-    case matches.size
-    when 1
-      load(matches.first)
-    when 0
-      nil
-    else
-      sprintf('Found multiple files when looking for %s: %s', name, matches.join(', '))
-      raise AmbiguityError, message
-    end
-  end
-
-  def load_resources
-    Dir['resources/**/*.{json,yml,yaml}'].sort.each_with_object({}) do |path, acc|
-      relative_path = path.sub(/^resources\//, '')
-      acc[relative_path] = load(path)
-    end
-  end
-
-  def load(path)
-    YAML.load_file(path)
-  rescue Psych::SyntaxError => e
-    raise ParseError, sprintf('Invalid template fragment: %s', e.message), e.backtrace
-  end
-
-  def validate_template(template)
-    @cf_client.validate_template(template_body: template)
-  rescue Aws::CloudFormation::Errors::ValidationError => e
-    raise ValidationError, "Invalid template: #{e.message}", e.backtrace
-  end
-
-  def compile_resources(resources)
-    resources.each_with_object({}) do |(relative_path, resource), compiled_resources|
-      name = relative_path_to_name(relative_path)
-      compiled_resources[name] = expand_refs(resource)
-    end
-  end
-
-  def compile_template(parameters, mappings, resources)
-    template = {'AWSTemplateFormatVersion' => '2010-09-09'}
-    template['Resources'] = compile_resources(resources)
-    template['Parameters'] = parameters if parameters
-    template['Mappings'] = mappings if mappings
-    template
-  end
-
-  def relative_path_to_name(relative_path)
-    name = relative_path.dup
-    name.sub!(/\.([^.]+)$/, '')
-    name.gsub!('/', '_')
-    name.gsub!(/_.|^./) { |str| str[-1].upcase }
-    name
-  end
-
-  def expand_refs(resource)
-    case resource
-    when Hash
-      if (reference = resource.delete('ResolveRef'))
-        resource['Ref'] = relative_path_to_name(reference)
-      else
-        resource.each_value do |v|
-          expand_refs(v)
-        end
-      end
-    when Array
-      resource.each do |v|
-        expand_refs(v)
-      end
-    end
   end
 end
 
 if $0 == __FILE__
-  exit(TemplateCompiler.new.run(ARGV))
+  exit(Main.new.run(ARGV))
 end
