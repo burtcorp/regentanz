@@ -86,6 +86,8 @@ module Regentanz
       when Hash
         if (reference = resource.delete('ResolveRef'))
           resource.merge('Ref' => relative_path_to_name(reference))
+        elsif (reference = resource.delete('ResolveName'))
+          relative_path_to_name(reference)
         else
           resource.merge(resource) do |_, v, _|
             expand_refs(v)
