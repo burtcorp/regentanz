@@ -85,16 +85,18 @@ module Regentanz
       case resource
       when Hash
         if (reference = resource.delete('ResolveRef'))
-          resource['Ref'] = relative_path_to_name(reference)
+          resource.merge('Ref' => relative_path_to_name(reference))
         else
-          resource.each_value do |v|
+          resource.merge(resource) do |_, v, _|
             expand_refs(v)
           end
         end
       when Array
-        resource.each do |v|
+        resource.map do |v|
           expand_refs(v)
         end
+      else
+        resource
       end
     end
   end
