@@ -16,6 +16,7 @@ module Regentanz
       Dir.chdir(stack_path) do
         options[:parameters] = load_top_level_file('parameters')
         options[:mappings] = load_top_level_file('mappings')
+        options[:conditions] = load_top_level_file('conditions')
         resources = load_resources
       end
       compile_template(resources, options)
@@ -26,6 +27,7 @@ module Regentanz
       template['Resources'] = compile_resources(resources)
       template['Parameters'] = options[:parameters] if options[:parameters]
       template['Mappings'] = options[:mappings] if options[:mappings]
+      template['Conditions'] = options[:conditions] if options[:conditions]
       template
     end
 
