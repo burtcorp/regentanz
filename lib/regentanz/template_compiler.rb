@@ -17,6 +17,7 @@ module Regentanz
         options[:parameters] = load_top_level_file('parameters')
         options[:mappings] = load_top_level_file('mappings')
         options[:conditions] = load_top_level_file('conditions')
+        options[:outputs] = load_top_level_file('outputs')
         resources = load_resources
       end
       compile_template(resources, options)
@@ -25,9 +26,10 @@ module Regentanz
     def compile_template(resources, options = {})
       template = {'AWSTemplateFormatVersion' => '2010-09-09'}
       template['Resources'] = compile_resources(resources)
-      template['Parameters'] = options[:parameters] if options[:parameters]
-      template['Mappings'] = options[:mappings] if options[:mappings]
-      template['Conditions'] = options[:conditions] if options[:conditions]
+      template['Parameters'] = expand_refs(options[:parameters]) if options[:parameters]
+      template['Mappings'] = expand_refs(options[:mappings]) if options[:mappings]
+      template['Conditions'] = expand_refs(options[:conditions]) if options[:conditions]
+      template['Outputs'] = expand_refs(options[:outputs]) if options[:outputs]
       template
     end
 
