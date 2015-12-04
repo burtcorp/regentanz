@@ -18,6 +18,7 @@ module Regentanz
         options[:mappings] = load_top_level_file('mappings')
         options[:conditions] = load_top_level_file('conditions')
         options[:outputs] = load_top_level_file('outputs')
+        options[:metadata] = load_top_level_file('metadata')
         resources = load_resources
       end
       compile_template(resources, options)
@@ -30,6 +31,7 @@ module Regentanz
       template['Mappings'] = expand_refs(options[:mappings]) if options[:mappings]
       template['Conditions'] = expand_refs(options[:conditions]) if options[:conditions]
       template['Outputs'] = expand_refs(options[:outputs]) if options[:outputs]
+      template['Metadata'] = expand_refs(options[:metadata]) if options[:metadata]
       template
     end
 
