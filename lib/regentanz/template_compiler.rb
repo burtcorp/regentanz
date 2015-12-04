@@ -18,7 +18,6 @@ module Regentanz
         options[:mappings] = load_top_level_file('mappings')
         options[:conditions] = load_top_level_file('conditions')
         options[:outputs] = load_top_level_file('outputs')
-        options[:metadata] = load_top_level_file('metadata')
         resources = load_resources
       end
       compile_template(resources, options)
@@ -27,11 +26,18 @@ module Regentanz
     def compile_template(resources, options = {})
       template = {'AWSTemplateFormatVersion' => '2010-09-09'}
       template['Resources'] = compile_resources(resources)
-      template['Parameters'] = expand_refs(options[:parameters]) if options[:parameters]
+      if options[:parameters]
+        parameters, parameter_metadata = compile_parameters(options[:parameters])
+        template['Parameters'] = parameters
+        unless parameter_metadata.empty?
+          template['Metadata'] = {
+            'AWS::CloudFormation::Interface' => parameter_metadata,
+          }
+        end
+      end
       template['Mappings'] = expand_refs(options[:mappings]) if options[:mappings]
       template['Conditions'] = expand_refs(options[:conditions]) if options[:conditions]
       template['Outputs'] = expand_refs(options[:outputs]) if options[:outputs]
-      template['Metadata'] = expand_refs(options[:metadata]) if options[:metadata]
       template
     end
 
@@ -78,6 +84,33 @@ module Regentanz
       end
     end
 
+    def compile_parameters(parameters)
+      compiled_parameters, compiled_metadata = {}, {}
+      parameter_groups, parameter_labels = [], {}
+      parameters.each do |key, value|
+        case value['Type']
+        when 'Regentanz::ParameterGroup'
+          parameter_group = value['Parameters'].map do |name, options|
+            if (label = options.delete('Label'))
+              parameter_labels[name] = {'default' => label}
+            end
+            compiled_parameters[name] = options
+            name
+          end
+          parameter_groups << {
+            'Label' => {'default' => key},
+            'Parameters' => parameter_group,
+          }
+        when String
+          compiled_parameters[key] = value
+        else
+          raise ValidationError, sprintf('Unknown or missing `Type`: %p', type)
+        end
+      end
+      compiled_metadata['ParameterGroups'] = parameter_groups unless parameter_groups.empty?
+      compiled_metadata['ParameterLabels'] = parameter_labels unless parameter_labels.empty?
+      return compiled_parameters, compiled_metadata
+    end
 
     def relative_path_to_name(relative_path)
       name = relative_path.dup
