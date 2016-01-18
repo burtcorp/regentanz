@@ -37,6 +37,7 @@ module Regentanz
       template['Mappings'] = expand_refs(options[:mappings]) if options[:mappings]
       template['Conditions'] = expand_refs(options[:conditions]) if options[:conditions]
       template['Outputs'] = expand_refs(options[:outputs]) if options[:outputs]
+      validate_parameter_use(template)
       template
     end
 
@@ -49,6 +50,15 @@ module Regentanz
     end
 
     private
+
+    def validate_parameter_use(template)
+      unused = {}
+      template.fetch('Parameters', {}).each_key { |key| unused[key] = true }
+      each_ref(template) { |key| unused.delete(key) }
+      unless unused.empty?
+        raise ValidationError, "Unused parameters: #{unused.keys.join(', ')}"
+      end
+    end
 
     def load_top_level_file(name)
       matches = Dir["#{name}.{json,yml,yaml}"]
@@ -129,6 +139,19 @@ module Regentanz
       name.gsub!('/', '_')
       name.gsub!(/_.|^./) { |str| str[-1].upcase }
       name
+    end
+
+    def each_ref(resource, &block)
+      case resource
+      when Hash
+        if (ref = resource['Ref'])
+          yield ref
+        else
+          resource.each_value { |v| each_ref(v, &block) }
+        end
+      when Array
+        resource.each { |v| each_ref(v, &block) }
+      end
     end
 
     def expand_refs(resource)
