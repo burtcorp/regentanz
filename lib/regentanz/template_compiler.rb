@@ -27,13 +27,9 @@ module Regentanz
       template = {'AWSTemplateFormatVersion' => '2010-09-09'}
       template['Resources'] = compile_resources(resources)
       if options[:parameters]
-        parameters, parameter_metadata = compile_parameters(options[:parameters])
+        parameters, metadata = compile_parameters(options[:parameters])
         template['Parameters'] = parameters
-        unless parameter_metadata.empty?
-          template['Metadata'] = {
-            'AWS::CloudFormation::Interface' => parameter_metadata,
-          }
-        end
+        template['Metadata'] = {'AWS::CloudFormation::Interface' => metadata}
       end
       template['Mappings'] = expand_refs(options[:mappings]) if options[:mappings]
       template['Conditions'] = expand_refs(options[:conditions]) if options[:conditions]
@@ -84,32 +80,28 @@ module Regentanz
       end
     end
 
-    def compile_parameters(parameters)
-      compiled_parameters, compiled_metadata = {}, {}
-      parameter_groups, parameter_labels = [], {}
-      parameters.each do |key, value|
-        case value['Type']
-        when 'Regentanz::ParameterGroup'
-          parameter_group = value['Parameters'].map do |name, options|
-            if (label = options.delete('Label'))
-              parameter_labels[name] = {'default' => label}
-            end
-            compiled_parameters[name] = options
-            name
-          end
-          parameter_groups << {
-            'Label' => {'default' => key},
-            'Parameters' => parameter_group,
+    def compile_parameters(specifications)
+      groups = []
+      parameters = {}
+      specifications.each do |name, options|
+        if options['Type'] == 'Regentanz::ParameterGroup'
+          group_parameters = options['Parameters']
+          parameters.merge!(group_parameters)
+          groups << {
+            'Label' => {'default' => name},
+            'Parameters' => group_parameters.keys
           }
-        when String
-          compiled_parameters[key] = value
         else
-          raise ValidationError, sprintf('Unknown or missing `Type`: %p', type)
+          parameters[name] = options
         end
       end
-      compiled_metadata['ParameterGroups'] = parameter_groups unless parameter_groups.empty?
-      compiled_metadata['ParameterLabels'] = parameter_labels unless parameter_labels.empty?
-      return compiled_parameters, compiled_metadata
+      labels = parameters.each_with_object({}) do |(name, options), labels|
+        if (label = options.delete('Label'))
+          labels[name] = {'default' => label}
+        end
+      end
+      metadata = {'ParameterGroups' => groups, 'ParameterLabels' => labels}
+      return parameters, metadata
     end
 
     def relative_path_to_name(relative_path)
