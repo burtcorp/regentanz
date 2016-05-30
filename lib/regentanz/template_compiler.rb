@@ -7,6 +7,7 @@ module Regentanz
     AmbiguityError = Class.new(Regentanz::Error)
 
     def initialize(options = {})
+      @resource_compilers = {}
       @cf_client = options[:cloud_formation_client] || Aws::CloudFormation::Client.new(region: ENV.fetch('AWS_REGION', 'eu-west-1'))
     end
 
@@ -25,9 +26,11 @@ module Regentanz
 
     def compile_template(resources, options = {})
       template = {'AWSTemplateFormatVersion' => '2010-09-09'}
-      template['Resources'] = compile_resources(resources)
-      if options[:parameters]
-        parameters, metadata = compile_parameters(options[:parameters])
+      compiled = compile_resources(resources)
+      template['Resources'] = compiled.delete(:resources)
+      options = compiled.merge(options) { |_, v1, v2| v1.merge(v2) }
+      if (parameters = options[:parameters]) && !parameters.empty?
+        parameters, metadata = compile_parameters(parameters)
         template['Parameters'] = parameters
         template['Metadata'] = {'AWS::CloudFormation::Interface' => metadata}
       end
@@ -74,9 +77,23 @@ module Regentanz
     end
 
     def compile_resources(resources)
-      resources.each_with_object({}) do |(relative_path, resource), compiled_resources|
+      compiled = {resources: {}}
+      resources.map do |relative_path, resource|
         name = relative_path_to_name(relative_path)
-        compiled_resources[name] = expand_refs(resource)
+        if (type = resource['Type']).start_with?('Regentanz::Resources::')
+          compiled.merge!(resource_compiler(type).compile(name, resource)) { |_, v1, v2| v1.merge(v2) }
+        else
+          compiled[:resources][name] = expand_refs(resource)
+        end
+      end
+      compiled
+    end
+
+    def resource_compiler(type)
+      @resource_compilers[type] ||= begin
+        type = type.split('::').reduce(Object, &:const_get).new
+      rescue NameError
+        raise Regentanz::Error, "No resource compiler for #{type}"
       end
     end
 

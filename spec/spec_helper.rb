@@ -1,0 +1,3 @@
+require 'regentanz'
+
+require 'tmpdir'

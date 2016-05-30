@@ -7,13 +7,31 @@ GEM
       multi_json (~> 1.0)
       multi_xml (~> 0.5)
     builder (3.2.2)
+    diff-lcs (1.2.5)
     jmespath (1.0.2)
       multi_json (~> 1.0)
     multi_json (1.11.0)
     multi_xml (0.5.5)
+    rspec (3.4.0)
+      rspec-core (~> 3.4.0)
+      rspec-expectations (~> 3.4.0)
+      rspec-mocks (~> 3.4.0)
+    rspec-core (3.4.4)
+      rspec-support (~> 3.4.0)
+    rspec-expectations (3.4.0)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.4.0)
+    rspec-mocks (3.4.1)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.4.0)
+    rspec-support (3.4.1)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
   aws-sdk-core
+  rspec
+
+BUNDLED WITH
+   1.10.5
