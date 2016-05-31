@@ -64,7 +64,7 @@ module Regentanz
         compiler.compile_template(resources, parameters: parameters, mappings: mappings, conditions: conditions, outputs: outputs)
       end
 
-      it 'generates an CloudFormation compatible template' do
+      it 'generates an CloudFormation compatible template', aggregate_failures: true do
         expect(template['AWSTemplateFormatVersion']).to eq('2010-09-09')
         expect(template['Mappings']).to eq(mappings)
         expect(template['Conditions']).to eq(conditions)
@@ -214,7 +214,7 @@ module Regentanz
             nil
           end
 
-          it 'includes the values from the compiled resource' do
+          it 'includes the values from the compiled resource', aggregate_failures: true do
             expect(template['Resources']).to include('CoreTestAsg', 'CoreTestLc')
             expect(template['Parameters']).to include('CoreTestMinSize')
             expect(template['Conditions']).to include('CoreTestUseSpot')
@@ -256,7 +256,7 @@ module Regentanz
         compiler.compile_from_path('template')
       end
 
-      it 'loads parameters, mappings, conditions, outputs from JSON files' do
+      it 'loads parameters, mappings, conditions, outputs from JSON files', aggregate_failures: true do
         File.write('template/parameters.json', '{"Parameter":{"Type":"Number"}}')
         File.write('template/mappings.json', '{"Mapping":{"A":{"B":"C"}}}')
         File.write('template/conditions.json', '{"Staging":{"Fn:Equals":[{"Ref":"Environment"},"staging"]}}')
@@ -267,7 +267,7 @@ module Regentanz
         expect(template['Outputs'].keys).to eq(%w[VolumeId])
       end
 
-      it 'loads parameters, mappings, conditions, outputs from YAML files' do
+      it 'loads parameters, mappings, conditions, outputs from YAML files', aggregate_failures: true do
         File.write('template/parameters.yaml', 'Parameter: {Type: Number}')
         File.write('template/mappings.yaml', 'Mapping: {A: {B: C}}')
         File.write('template/conditions.yml', 'Staging: {"Fn:Equals": [{Ref: Environment}, staging]}')
