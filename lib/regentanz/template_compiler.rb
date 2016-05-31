@@ -28,7 +28,7 @@ module Regentanz
       template = {'AWSTemplateFormatVersion' => '2010-09-09'}
       compiled = compile_resources(resources)
       template['Resources'] = compiled.delete(:resources)
-      options = compiled.merge(options) { |_, v1, v2| v1.merge(v2) }
+      options = compiled.merge(options) { |_, v1, v2| v1.merge(v2 || {}) }
       if (parameters = options[:parameters]) && !parameters.empty?
         parameters, metadata = compile_parameters(parameters)
         template['Parameters'] = parameters

@@ -196,6 +196,32 @@ module Regentanz
         it 'keeps parameters from outside the resource' do
           expect(template['Mappings']).to include('Version')
         end
+
+        context 'with nil valued options' do
+          let :parameters do
+            nil
+          end
+
+          let :conditions do
+            nil
+          end
+
+          let :mappings do
+            nil
+          end
+
+          let :outputs do
+            nil
+          end
+
+          it 'includes the values from the compiled resource' do
+            expect(template['Resources']).to include('CoreTestAsg', 'CoreTestLc')
+            expect(template['Parameters']).to include('CoreTestMinSize')
+            expect(template['Conditions']).to include('CoreTestUseSpot')
+            expect(template['Mappings']).to include('Ami')
+            expect(template).not_to include('Outputs')
+          end
+        end
       end
 
       context 'with an non-existant resource type' do
