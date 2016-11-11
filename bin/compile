@@ -24,6 +24,6 @@ class Main
   end
 end
 
-if $0 == __FILE__
+if File.identical?($0, __FILE__)
   exit(Main.new.run(ARGV))
 end
