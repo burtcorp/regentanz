@@ -81,7 +81,9 @@ module Regentanz
       resources.map do |relative_path, resource|
         name = relative_path_to_name(relative_path)
         if (type = resource['Type']).start_with?('Regentanz::Resources::')
-          compiled.merge!(resource_compiler(type).compile(name, resource)) { |_, v1, v2| v1.merge(v2) }
+          expanded_template = resource_compiler(type).compile(name, resource)
+          expanded_template[:resources] = expand_refs(expanded_template[:resources])
+          compiled.merge!(expanded_template) { |_, v1, v2| v1.merge(v2) }
         else
           compiled[:resources][name] = expand_refs(resource)
         end

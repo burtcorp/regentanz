@@ -3,6 +3,28 @@
 require 'spec_helper'
 
 module Regentanz
+  module Resources
+    module Test
+      class SecurityGroup
+        def compile(name, resource)
+          {:resources => {name => resource.merge('Type' => 'AWS::EC2::SecurityGroup')}}
+        end
+      end
+
+      class BucketAndPolicy
+        def compile(name, resource)
+          result = {:parameters => {}, :resources => {}, :mappings => {}, :conditions => {}}
+          result[:parameters]['BucketName'] = {'Type' => 'String'}
+          result[:resources][name + 'Bucket'] = {}
+          result[:resources][name + 'Policy'] = {}
+          result[:mappings]['Prefix'] = {'production' => 'prod-', 'test' => 'test-'}
+          result[:conditions]['IsEu'] = {'Fn::Equals' => [{'Ref' => 'AWS::Region'}, 'eu-west-1']}
+          result
+        end
+      end
+    end
+  end
+
   describe TemplateCompiler do
     let :compiler do
       described_class.new(cloud_formation_client: cf_client)
@@ -161,7 +183,7 @@ module Regentanz
         let :resources do
           super().merge(
             'core/test.json' => {
-              'Type' => 'Regentanz::Resources::BucketAndPolicy',
+              'Type' => 'Regentanz::Resources::Test::BucketAndPolicy',
               'Properties' => {
                 'Name' => {'Ref' => 'CoreTestBucketName'},
               }
@@ -197,6 +219,38 @@ module Regentanz
           expect(template['Mappings']).to include('Version')
         end
 
+        it 'adds conditions from the compiled resource' do
+          expect(template['Conditions']).to include('IsEu')
+        end
+
+        it 'keeps conditions from outside the resource' do
+          expect(template['Conditions']).to include('Staging')
+        end
+
+        context 'that contains a reference to another resource' do
+          let :resources do
+            super().merge(
+              'core/sg.json' => {
+                'Type' => 'Regentanz::Resources::Test::SecurityGroup',
+                'Properties' => {
+                  'GroupDescription' => 'foobar',
+                  'VpcId' => {'ResolveRef' => 'core/vpc'},
+                }
+              },
+              'core/vpc.json' => {
+                'Type' => 'AWS::EC2::VPC',
+                'Properties' => {
+                  'CidrBlock' => '10.0.0.0/8',
+                }
+              }
+            )
+          end
+
+          it 'resolves the reference returned by the custom resource' do
+            expect(template['Resources']['CoreSg']['Properties']['VpcId']).to eq({'Ref' => 'CoreVpc'})
+          end
+        end
+
         context 'with nil valued options' do
           let :parameters do
             nil
@@ -215,10 +269,10 @@ module Regentanz
           end
 
           it 'includes the values from the compiled resource', aggregate_failures: true do
-            expect(template['Resources']).to include('CoreTestAsg', 'CoreTestLc')
-            expect(template['Parameters']).to include('CoreTestMinSize')
-            expect(template['Conditions']).to include('CoreTestUseSpot')
-            expect(template['Mappings']).to include('Ami')
+            expect(template['Resources']).to include('CoreTestBucket', 'CoreTestPolicy')
+            expect(template['Parameters']).to include('BucketName')
+            expect(template['Conditions']).to include('IsEu')
+            expect(template['Mappings']).to include('Prefix')
             expect(template).not_to include('Outputs')
           end
         end
@@ -310,21 +364,6 @@ module Regentanz
       it 'produces a validation error for credentials errors' do
         allow(cf_client).to receive(:validate_template).and_raise(Aws::Errors::MissingCredentialsError, 'boork')
         expect { compiler.validate_template('my-template') }.to raise_error(described_class::ValidationError, 'Validation requires AWS credentials')
-      end
-    end
-  end
-end
-
-module Regentanz
-  module Resources
-    class BucketAndPolicy
-      def compile(name, resource)
-        result = {:parameters => {}, :resources => {}, :outputs => {}, :mappings => {}}
-        result[:parameters]['BucketName'] = {'Type' => 'String'}
-        result[:resources][name + 'Bucket'] = {}
-        result[:resources][name + 'Policy'] = {}
-        result[:mappings]['Prefix'] = {'production' => 'prod-', 'test' => 'test-'}
-        result
       end
     end
   end
