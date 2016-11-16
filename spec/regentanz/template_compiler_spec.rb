@@ -5,9 +5,14 @@ require 'spec_helper'
 module Regentanz
   module Resources
     module Test
-      class SecurityGroup
+      class SecurityGroupPair
         def compile(name, resource)
-          {:resources => {name => resource.merge('Type' => 'AWS::EC2::SecurityGroup')}}
+          {
+            :resources => {
+              "#{name}1" => resource.merge('Type' => 'AWS::EC2::SecurityGroup'),
+              "#{name}2" => resource.merge('Type' => 'AWS::EC2::SecurityGroup'),
+            }
+          }
         end
       end
 
@@ -231,9 +236,9 @@ module Regentanz
           let :resources do
             super().merge(
               'core/sg.json' => {
-                'Type' => 'Regentanz::Resources::Test::SecurityGroup',
+                'Type' => 'Regentanz::Resources::Test::SecurityGroupPair',
                 'Properties' => {
-                  'GroupDescription' => 'foobar',
+                  'GroupDescription' => {'Fn::Join' => [' ', 'SG for ', {'ResolveName' => 'core/vpc'}]},
                   'VpcId' => {'ResolveRef' => 'core/vpc'},
                 }
               },
@@ -246,8 +251,18 @@ module Regentanz
             )
           end
 
-          it 'resolves the reference returned by the custom resource' do
-            expect(template['Resources']['CoreSg']['Properties']['VpcId']).to eq({'Ref' => 'CoreVpc'})
+          it 'resolves references in the resources returned by the custom resource' do
+            aggregate_failures do
+              expect(template['Resources']['CoreSg1']['Properties']['VpcId']).to eq({'Ref' => 'CoreVpc'})
+              expect(template['Resources']['CoreSg1']['Properties']['GroupDescription']).to eq({'Fn::Join' => [' ', 'SG for ', 'CoreVpc']})
+            end
+          end
+
+          it 'does not mutate the input template' do
+            aggregate_failures do
+              expect(template['Resources']['CoreSg2']['Properties']['VpcId']).to eq({'Ref' => 'CoreVpc'})
+              expect(template['Resources']['CoreSg2']['Properties']['GroupDescription']).to eq({'Fn::Join' => [' ', 'SG for ', 'CoreVpc']})
+            end
           end
         end
 

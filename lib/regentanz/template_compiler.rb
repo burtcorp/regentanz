@@ -134,9 +134,11 @@ module Regentanz
     def expand_refs(resource)
       case resource
       when Hash
-        if (reference = resource.delete('ResolveRef'))
-          resource.merge('Ref' => relative_path_to_name(reference))
-        elsif (reference = resource.delete('ResolveName'))
+        if (reference = resource['ResolveRef'])
+          resource.merge('Ref' => relative_path_to_name(reference)).tap do |new_resource|
+            new_resource.delete('ResolveRef')
+          end
+        elsif (reference = resource['ResolveName'])
           relative_path_to_name(reference)
         else
           resource.merge(resource) do |_, v, _|
