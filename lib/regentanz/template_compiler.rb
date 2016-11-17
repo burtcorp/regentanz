@@ -135,9 +135,10 @@ module Regentanz
       case resource
       when Hash
         if (reference = resource['ResolveRef'])
-          resource.merge('Ref' => relative_path_to_name(reference)).tap do |new_resource|
-            new_resource.delete('ResolveRef')
-          end
+          expanded_name = relative_path_to_name(reference)
+          expanded_resource = resource.merge('Ref' => expanded_name)
+          expanded_resource.delete('ResolveRef')
+          expanded_resource
         elsif (reference = resource['ResolveName'])
           relative_path_to_name(reference)
         else
