@@ -16,7 +16,7 @@ end
 
 class Main
   def initialize
-    @cf_client = Aws::CloudFormation::Client.new(region: ENV.fetch('AWS_REGION', 'eu-west-1'))
+    @cf_client = Aws::CloudFormation::Client.new(region: region)
     @compiler = Regentanz::TemplateCompiler.new(cloud_formation_client: @cf_client)
   end
 
@@ -39,6 +39,10 @@ class Main
   end
 
   private
+
+  def region
+    ENV['AWS_REGION'] || ENV['AWS_DEFAULT_REGION'] || 'eu-west-1'
+  end
 
   def get_template(stack_name)
     YAML.load(@cf_client.get_template(stack_name: stack_name)[:template_body])
