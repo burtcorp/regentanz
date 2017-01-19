@@ -20,8 +20,8 @@ module Regentanz
         def compile(name, resource)
           result = {:parameters => {}, :resources => {}, :mappings => {}, :conditions => {}}
           result[:parameters]['BucketName'] = {'Type' => 'String'}
-          result[:resources][name + 'Bucket'] = {}
-          result[:resources][name + 'Policy'] = {}
+          result[:resources][name + 'Bucket'] = {'Type' => 'AWS::S3::Bucket', 'Properties' => {'BucketName' => {'Ref' => 'BucketName'}}}
+          result[:resources][name + 'Policy'] = {'Type' => 'AWS::IAM::Policy', 'Properties' => {'PolicyName' => 'SomePolicy'}}
           result[:mappings]['Prefix'] = {'production' => 'prod-', 'test' => 'test-'}
           result[:conditions]['IsEu'] = {'Fn::Equals' => [{'Ref' => 'AWS::Region'}, 'eu-west-1']}
           result
@@ -47,17 +47,24 @@ module Regentanz
             'Properties' => {
               'ImageId' => {'Fn::FindInMap' => ['Ami', 'amzn-ami-2016.03.1', 'hvm']},
             }
+          },
+          'core/asg.json' => {
+            'Type' => 'AWS::AutoScaling::AutoScalingGroup',
+            'Properties' => {
+              'MinSize' => {'Ref' => 'MinInstances'},
+              'MaxSize' => {'Ref' => 'MaxInstances'},
+            }
           }
         }
       end
 
       let :parameters do
         {
-          'X' => {
+          'MinInstances' => {
             'Type' => 'Number',
             'Default' => 1,
           },
-          'Y' => {
+          'MaxInstances' => {
             'Type' => 'Number',
             'Default' => 1,
           },
@@ -101,7 +108,7 @@ module Regentanz
       end
 
       it 'names resources from their relative paths' do
-        expect(template['Resources'].keys).to eq(%w[CoreEc2Instance])
+        expect(template['Resources'].keys).to eq(%w[CoreEc2Instance CoreAsg])
       end
 
       it 'resolves references in resource definitions' do
@@ -140,13 +147,13 @@ module Regentanz
 
       context 'with parameter labels' do
         it 'removes the Label key from parameters' do
-          parameters['X']['Label'] = 'The X'
-          expect(template['Parameters']['X']).not_to include('Label')
+          parameters['MinInstances']['Label'] = 'The X'
+          expect(template['Parameters']['MinInstances']).not_to include('Label')
         end
 
         it 'adds parameter labels to the interface metadata' do
-          parameters['X']['Label'] = 'The X'
-          expect(template['Metadata']['AWS::CloudFormation::Interface']['ParameterLabels']).to eq('X' => {'default' => 'The X'})
+          parameters['MinInstances']['Label'] = 'The minimum number of instances'
+          expect(template['Metadata']['AWS::CloudFormation::Interface']['ParameterLabels']).to eq('MinInstances' => {'default' => 'The minimum number of instances'})
         end
       end
 
@@ -167,16 +174,22 @@ module Regentanz
           )
         end
 
+        let :resources do
+          r = super()
+          r['core/asg.json']['Properties']['AvailabilityZones'] = {'Ref' => 'Nested'}
+          r
+        end
+
         it 'removes the group parameters from the output' do
           expect(template['Parameters']).not_to include('Group')
         end
 
         it 'lifts the grouped parameters to the top level' do
-          expect(template['Parameters'].keys).to eq(%w[X Y Nested])
+          expect(template['Parameters'].keys).to eq(%w[MinInstances MaxInstances Nested])
         end
 
         it 'lifts the grouped parameters to the top level' do
-          expect(template['Parameters'].keys).to eq(%w[X Y Nested])
+          expect(template['Parameters'].keys).to eq(%w[MinInstances MaxInstances Nested])
         end
 
         it 'adds parameter groups to the interface metadata' do
@@ -192,7 +205,13 @@ module Regentanz
               'Properties' => {
                 'Name' => {'Ref' => 'CoreTestBucketName'},
               }
-            }
+            },
+            'core/lc.json' => {
+              'Type' => 'AWS::AutoScaling::LaunchConfiguration',
+              'Properties' => {
+                'SecurityGroups' => [{'Ref' => 'ExtraSecurityGroup'}]
+              }
+            },
           )
         end
 
@@ -213,7 +232,7 @@ module Regentanz
         end
 
         it 'keeps parameters from outside the resource' do
-          expect(template['Parameters']).to include('X')
+          expect(template['Parameters']).to include('MinInstances')
         end
 
         it 'adds mappings from the compiled resource' do
@@ -328,7 +347,7 @@ module Regentanz
       it 'loads parameters, mappings, conditions, outputs from JSON files', aggregate_failures: true do
         File.write('template/parameters.json', '{"Parameter":{"Type":"Number"}}')
         File.write('template/mappings.json', '{"Mapping":{"A":{"B":"C"}}}')
-        File.write('template/conditions.json', '{"Staging":{"Fn:Equals":[{"Ref":"Environment"},"staging"]}}')
+        File.write('template/conditions.json', '{"Staging":{"Fn:Equals":[{"Ref":"Environment"},{"Ref":"Parameter"}]}}')
         File.write('template/outputs.json', '{"VolumeId":{"Value":{"Ref":"Volume"}}}')
         expect(template['Parameters'].keys).to eq(%w[Parameter])
         expect(template['Mappings'].keys).to eq(%w[Mapping])
@@ -339,7 +358,7 @@ module Regentanz
       it 'loads parameters, mappings, conditions, outputs from YAML files', aggregate_failures: true do
         File.write('template/parameters.yaml', 'Parameter: {Type: Number}')
         File.write('template/mappings.yaml', 'Mapping: {A: {B: C}}')
-        File.write('template/conditions.yml', 'Staging: {"Fn:Equals": [{Ref: Environment}, staging]}')
+        File.write('template/conditions.yml', 'Staging: {"Fn:Equals": [{Ref: Environment}, {Ref: Parameter}]}')
         File.write('template/outputs.yml', 'VolumeId: {Value: {Ref: Volume}}')
         expect(template['Parameters'].keys).to eq(%w[Parameter])
         expect(template['Mappings'].keys).to eq(%w[Mapping])
