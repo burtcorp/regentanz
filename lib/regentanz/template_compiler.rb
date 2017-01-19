@@ -146,6 +146,15 @@ module Regentanz
       when Hash
         if (ref = resource['Ref'])
           yield ref
+        elsif (substitution = resource['Fn::Sub'])
+          case substitution
+          when Array
+            each_ref(substitution, &block)
+          else
+            substitution.scan(/\$\{([^}]+)\}/) do |matches|
+              block.call(matches[0])
+            end
+          end
         else
           resource.each_value { |v| each_ref(v, &block) }
         end

@@ -329,16 +329,37 @@ module Regentanz
         end
       end
 
-      context 'when there are unused parameters' do
+      context 'when validating parameters parameters' do
         let :parameters do
           super().merge(
             'Foo' => {'Type' => 'String'},
             'Bar' => {'Type' => 'String'},
+            'Baz' => {'Type' => 'String'},
           )
         end
 
-        it 'raises ValidationError' do
-          expect { template }.to raise_error(described_class::ValidationError, 'Unused parameters: Foo, Bar')
+        context 'and there are unused parameters' do
+          it 'raises ValidationError' do
+            expect { template }.to raise_error(described_class::ValidationError, 'Unused parameters: Foo, Bar, Baz')
+          end
+        end
+
+        context 'and parameters are used in Fn::Sub' do
+          let :resources do
+            super().merge(
+              'core/test.json' => {
+                'Type' => 'AWS::EC2::Instance',
+                'Properties' => {
+                  'SomeProp' => {'Fn::Sub' => 'xyz:${Foo}/bar/${Baz}'},
+                  'SomeOtherProp' => {'Fn::Sub' => ['${barbar}!', {'barbar' => {'Ref' => 'Bar'}}]},
+                }
+              }
+            )
+          end
+
+          it 'raises ValidationError' do
+            expect { template }.to_not raise_error
+          end
         end
       end
     end
