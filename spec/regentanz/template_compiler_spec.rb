@@ -328,6 +328,19 @@ module Regentanz
           expect { template }.to raise_error(Regentanz::Error, 'No resource compiler for Regentanz::Resources::NonexistantResource')
         end
       end
+
+      context 'when there are unused parameters' do
+        let :parameters do
+          super().merge(
+            'Foo' => {'Type' => 'String'},
+            'Bar' => {'Type' => 'String'},
+          )
+        end
+
+        it 'raises ValidationError' do
+          expect { template }.to raise_error(described_class::ValidationError, 'Unused parameters: Foo, Bar')
+        end
+      end
     end
 
     describe '#compile_from_path' do
