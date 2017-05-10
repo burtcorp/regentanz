@@ -10,7 +10,7 @@ class Diff
   end
 
   def to_json(*args)
-    %(\e[31m#{@new_object.to_json(*args)}\e[m\e[32m#{@old_object.to_json(*args)}\e[m)
+    %(\e[31m#{@old_object.to_json(*args)}\e[m\e[32m#{@new_object.to_json(*args)}\e[m)
   end
 end
 
