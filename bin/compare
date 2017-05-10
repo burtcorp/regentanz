@@ -51,6 +51,9 @@ class Main
   end
 
   def compare(new_template, old_template)
+    if new_template.is_a?(Date) && old_template.is_a?(String)
+      new_template = new_template.to_s
+    end
     if new_template.class != old_template.class
       Diff.new(new_template, old_template)
     else
