@@ -6,12 +6,13 @@ module Regentanz
     ValidationError = Class.new(Regentanz::Error)
     AmbiguityError = Class.new(Regentanz::Error)
     CredentialsError = Class.new(Regentanz::Error)
+    TemplateError = Class.new(Regentanz::Error)
 
     def initialize(options = {})
       @resource_compilers = {}
       @region = ENV.fetch('AWS_REGION', 'eu-west-1')
       @cf_client = options[:cloud_formation_client] || Aws::CloudFormation::Client.new(region: @region)
-      @s3_resource = options[:s3_client] || Aws::S3::Resource.new(region: @region)
+      @s3_client = options[:s3_client] || Aws::S3::Resource.new(region: @region)
     rescue Aws::Sigv4::Errors::MissingCredentialsError => e
       raise CredentialsError, 'Validation requires AWS credentials'
     end
@@ -47,7 +48,9 @@ module Regentanz
     end
 
     def validate_template(stack_path, template)
-      if template.bytesize >= 51200
+      if template.bytesize > 460800
+        raise TemplateError, "Compiled template is too large: #{template.bytesize} bytes"
+      elsif template.bytesize >= 51200
         upload_template(stack_path, template) do |template_url|
           @cf_client.validate_template(template_url: template_url)
         end
@@ -63,7 +66,7 @@ module Regentanz
     def upload_template(stack_path, template)
       bucket = TEMPLATE_VALIDATION_BUCKET % {region: @region}
       key = TEMPLATE_VALIDATION_KEY % {stack: stack_path.gsub('/', '_'), timestamp: Time.now.to_i}
-      obj = @s3_resource.bucket(bucket).object(key)
+      obj = @s3_client.bucket(bucket).object(key)
       obj.put(body: template)
       yield obj.public_url
     end
