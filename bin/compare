@@ -26,7 +26,7 @@ class Main
     @compiler.validate_template(new_template.to_json)
     old_template = get_template(stack_name)
     diff = compare(new_template, old_template)
-    if diff != new_template
+    if diff.to_json != new_template.to_json
       output = JSON.pretty_generate(diff)
       puts(output)
       1
