@@ -8,7 +8,9 @@ module Regentanz
 
     def initialize(options = {})
       @resource_compilers = {}
-      @cf_client = options[:cloud_formation_client] || Aws::CloudFormation::Client.new(region: ENV.fetch('AWS_REGION', 'eu-west-1'))
+      @region = ENV.fetch('AWS_REGION', 'eu-west-1')
+      @cf_client = options[:cloud_formation_client] || Aws::CloudFormation::Client.new(region: @region)
+      @s3_resource = options[:s3_client] || Aws::S3::Resource.new(region: @region)
     end
 
     def compile_from_path(stack_path)
@@ -41,12 +43,44 @@ module Regentanz
       template
     end
 
-    def validate_template(template)
-      @cf_client.validate_template(template_body: template)
+    def validate_template(stack_path, template)
+      if template.bytesize >= 51200
+        upload_template(stack_path, template) do |template_url|
+          @cf_client.validate_template(template_url: template_url)
+        end
+      else
+        @cf_client.validate_template(template_body: template)
+      end
     rescue Aws::Errors::MissingCredentialsError => e
       raise ValidationError, 'Validation requires AWS credentials', e.backtrace
     rescue Aws::CloudFormation::Errors::ValidationError => e
       raise ValidationError, "Invalid template: #{e.message}", e.backtrace
+    end
+
+    def validate_template_url(template_url)
+      @cf_client.validate_template(template_url: template_url)
+    rescue Aws::Errors::MissingCredentialsError => e
+      raise ValidationError, 'Validation requires AWS credentials', e.backtrace
+    rescue Aws::CloudFormation::Errors::ValidationError => e
+      raise ValidationError, "Invalid template: #{e.message}", e.backtrace
+    end
+
+    TEMPLATE_VALIDATION_BUCKET = 'cf-templates-jn3m2hocei1o-%<region>s'
+    TEMPLATE_VALIDATION_KEY = 'regentanz/%<stack>s-%<timestamp>s.json'
+    def upload_template(stack_path, template)
+      bucket = TEMPLATE_VALIDATION_BUCKET % {region: @region}
+      key = TEMPLATE_VALIDATION_KEY % {stack: stack_path.gsub('/', '_'), timestamp: Time.now.to_i}
+      obj = @s3_resource.bucket(bucket).object(key)
+      obj.put(body: template)
+      yield obj.public_url
+    rescue Aws::Errors::MissingCredentialsError => e
+      raise ValidationError, 'Validation requires AWS credentials', e.backtrace
+    ensure
+      obj.delete if obj
+    end
+
+    def delete_uploaded_template(bucket, key)
+      @s3_resource.bucket(bucket).object(key).delete
     end
 
     private
