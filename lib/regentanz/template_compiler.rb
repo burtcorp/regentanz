@@ -5,12 +5,15 @@ module Regentanz
     ParseError = Class.new(Regentanz::Error)
     ValidationError = Class.new(Regentanz::Error)
     AmbiguityError = Class.new(Regentanz::Error)
+    CredentialsError = Class.new(Regentanz::Error)
 
     def initialize(options = {})
       @resource_compilers = {}
       @region = ENV.fetch('AWS_REGION', 'eu-west-1')
       @cf_client = options[:cloud_formation_client] || Aws::CloudFormation::Client.new(region: @region)
       @s3_resource = options[:s3_client] || Aws::S3::Resource.new(region: @region)
+    rescue Aws::Sigv4::Errors::MissingCredentialsError => e
+      raise CredentialsError, 'Validation requires AWS credentials'
     end
 
     def compile_from_path(stack_path)
@@ -51,16 +54,6 @@ module Regentanz
       else
         @cf_client.validate_template(template_body: template)
       end
-    rescue Aws::Errors::MissingCredentialsError => e
-      raise ValidationError, 'Validation requires AWS credentials', e.backtrace
-    rescue Aws::CloudFormation::Errors::ValidationError => e
-      raise ValidationError, "Invalid template: #{e.message}", e.backtrace
-    end
-
-    def validate_template_url(template_url)
-      @cf_client.validate_template(template_url: template_url)
-    rescue Aws::Errors::MissingCredentialsError => e
-      raise ValidationError, 'Validation requires AWS credentials', e.backtrace
     rescue Aws::CloudFormation::Errors::ValidationError => e
       raise ValidationError, "Invalid template: #{e.message}", e.backtrace
     end
@@ -73,14 +66,6 @@ module Regentanz
       obj = @s3_resource.bucket(bucket).object(key)
       obj.put(body: template)
       yield obj.public_url
-    rescue Aws::Errors::MissingCredentialsError => e
-      raise ValidationError, 'Validation requires AWS credentials', e.backtrace
-    ensure
-      obj.delete if obj
-    end
-
-    def delete_uploaded_template(bucket, key)
-      @s3_resource.bucket(bucket).object(key).delete
     end
 
     private
