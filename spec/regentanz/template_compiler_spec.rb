@@ -68,6 +68,12 @@ module Regentanz
             'Type' => 'Number',
             'Default' => 1,
           },
+          'Environment' => {
+            'Type' => 'String',
+          },
+          'Volume' => {
+            'Type' => 'AWS::EC2::Volume',
+          },
         }
       end
 
@@ -185,11 +191,7 @@ module Regentanz
         end
 
         it 'lifts the grouped parameters to the top level' do
-          expect(template['Parameters'].keys).to eq(%w[MinInstances MaxInstances Nested])
-        end
-
-        it 'lifts the grouped parameters to the top level' do
-          expect(template['Parameters'].keys).to eq(%w[MinInstances MaxInstances Nested])
+          expect(template['Parameters'].keys).to include('Nested')
         end
 
         it 'adds parameter groups to the interface metadata' do
@@ -209,7 +211,7 @@ module Regentanz
             'core/lc.json' => {
               'Type' => 'AWS::AutoScaling::LaunchConfiguration',
               'Properties' => {
-                'SecurityGroups' => [{'Ref' => 'ExtraSecurityGroup'}]
+                'SecurityGroups' => [{'Ref' => 'AWS::NoValue'}]
               }
             },
           )
@@ -253,7 +255,7 @@ module Regentanz
 
         context 'that contains a reference to another resource' do
           let :resources do
-            super().merge(
+            r = super().merge(
               'core/sg.json' => {
                 'Type' => 'Regentanz::Resources::Test::SecurityGroupPair',
                 'Properties' => {
@@ -266,7 +268,13 @@ module Regentanz
                 'Properties' => {
                   'CidrBlock' => '10.0.0.0/8',
                 }
-              }
+              },
+              'core/lc.json' => {
+                'Type' => 'AWS::AutoScaling::LaunchConfiguration',
+                'Properties' => {
+                  'SecurityGroups' => [{'Ref' => 'AWS::NoValue'}]
+                }
+              },
             )
           end
 
@@ -302,6 +310,10 @@ module Regentanz
             nil
           end
 
+          before do
+            resources.delete_if { |k,v| k != 'core/test.json' }
+          end
+
           it 'includes the values from the compiled resource', aggregate_failures: true do
             expect(template['Resources']).to include('CoreTestBucket', 'CoreTestPolicy')
             expect(template['Parameters']).to include('BucketName')
@@ -329,7 +341,7 @@ module Regentanz
         end
       end
 
-      context 'when validating parameters parameters' do
+      context 'when validating that parameters are used' do
         let :parameters do
           super().merge(
             'Foo' => {'Type' => 'String'},
@@ -357,8 +369,78 @@ module Regentanz
             )
           end
 
-          it 'raises ValidationError' do
+          it 'detects the usage' do
             expect { template }.to_not raise_error
+          end
+        end
+      end
+
+      context 'when validating that no undefined parameters are used' do
+        context 'and parameters are used in Fn::Sub' do
+          let :resources do
+            super().merge(
+              'core/test.json' => {
+                'Type' => 'AWS::EC2::Instance',
+                'Properties' => {
+                  'SomeProp' => {'Fn::Sub' => 'xyz:${Foo}/bar/${Baz}'},
+                  'SomeOtherProp' => {'Fn::Sub' => ['${barbar}!', {'barbar' => {'Ref' => 'Bar'}}]},
+                }
+              }
+            )
+          end
+
+          it 'raises ValidationError' do
+            expect { template }.to raise_error(described_class::ValidationError, 'Undefined parameters: Foo, Baz, Bar')
+          end
+        end
+
+        context 'and referring to other resources' do
+          let :resources do
+            super().merge(
+              'core/test.json' => {
+                'Type' => 'AWS::EC2::Instance',
+                'Properties' => {
+                  'SomeProp' => {'ResolveRef' => 'core/test2'}
+                }
+              },
+            )
+          end
+
+          it 'raises ValidationError' do
+            expect { template }.to raise_error(described_class::ValidationError, 'Undefined parameters: CoreTest2')
+          end
+
+          context 'when resource exists' do
+            let :resources do
+              super().merge(
+                'core/test2.json' => {
+                  'Type' => 'AWS::EC2::Instance',
+                  'Properties' => {
+                  }
+                },
+              )
+            end
+
+            it 'accepts the parameter' do
+              expect { template }.not_to raise_error
+            end
+          end
+        end
+
+        context 'and using built-in pseudo parameters' do
+          let :resources do
+            super().merge(
+              'core/test.json' => {
+                'Type' => 'AWS::EC2::Instance',
+                'Properties' => {
+                  'SomeProp' => {'Ref' => 'AWS::Region'}
+                }
+              }
+            )
+          end
+
+          it 'accepts the parameter' do
+            expect { template }.not_to raise_error
           end
         end
       end
@@ -381,8 +463,8 @@ module Regentanz
       it 'loads parameters, mappings, conditions, outputs from JSON files', aggregate_failures: true do
         File.write('template/parameters.json', '{"Parameter":{"Type":"Number"}}')
         File.write('template/mappings.json', '{"Mapping":{"A":{"B":"C"}}}')
-        File.write('template/conditions.json', '{"Staging":{"Fn:Equals":[{"Ref":"Environment"},{"Ref":"Parameter"}]}}')
-        File.write('template/outputs.json', '{"VolumeId":{"Value":{"Ref":"Volume"}}}')
+        File.write('template/conditions.json', '{"Staging":{"Fn:Equals":[{"Ref":"AWS::Region"},{"Ref":"Parameter"}]}}')
+        File.write('template/outputs.json', '{"VolumeId":{"Value":{"Ref":"Parameter"}}}')
         expect(template['Parameters'].keys).to eq(%w[Parameter])
         expect(template['Mappings'].keys).to eq(%w[Mapping])
         expect(template['Conditions'].keys).to eq(%w[Staging])
@@ -392,8 +474,8 @@ module Regentanz
       it 'loads parameters, mappings, conditions, outputs from YAML files', aggregate_failures: true do
         File.write('template/parameters.yaml', 'Parameter: {Type: Number}')
         File.write('template/mappings.yaml', 'Mapping: {A: {B: C}}')
-        File.write('template/conditions.yml', 'Staging: {"Fn:Equals": [{Ref: Environment}, {Ref: Parameter}]}')
-        File.write('template/outputs.yml', 'VolumeId: {Value: {Ref: Volume}}')
+        File.write('template/conditions.yml', 'Staging: {"Fn:Equals": [{Ref: "AWS::Region"}, {Ref: Parameter}]}')
+        File.write('template/outputs.yml', 'VolumeId: {Value: {Ref: Parameter}}')
         expect(template['Parameters'].keys).to eq(%w[Parameter])
         expect(template['Mappings'].keys).to eq(%w[Mapping])
         expect(template['Conditions'].keys).to eq(%w[Staging])

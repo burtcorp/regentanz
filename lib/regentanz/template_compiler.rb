@@ -51,12 +51,31 @@ module Regentanz
 
     private
 
+    PSEUDO_PARAMETERS = [
+      'AWS::AccountId',
+      'AWS::NotificationARNs',
+      'AWS::NoValue',
+      'AWS::Region',
+      'AWS::StackId',
+      'AWS::StackName',
+    ].map!(&:freeze).freeze
+
     def validate_parameter_use(template)
-      unused = {}
-      template.fetch('Parameters', {}).each_key { |key| unused[key] = true }
-      each_ref(template) { |key| unused.delete(key) }
+      available = {}
+      template.fetch('Parameters', {}).each_key { |key| available[key] = true }
+      unused = available.dup
+      PSEUDO_PARAMETERS.each { |key| available[key] = true }
+      template.fetch('Resources', {}).each_key { |key| available[key] = true }
+      undefined = {}
+      each_ref(template) do |key|
+        unused.delete(key)
+        undefined[key] = true unless available[key]
+      end
       unless unused.empty?
         raise ValidationError, "Unused parameters: #{unused.keys.join(', ')}"
+      end
+      unless undefined.empty?
+        raise ValidationError, "Undefined parameters: #{undefined.keys.join(', ')}"
       end
     end
 
