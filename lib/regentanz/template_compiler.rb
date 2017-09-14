@@ -49,7 +49,7 @@ module Regentanz
 
     def validate_template(stack_path, template)
       if template.bytesize > 460800
-        raise TemplateError, "Compiled template is too large: #{template.bytesize} bytes"
+        raise TemplateError, "Compiled template is too large: #{template.bytesize} bytes > 460800"
       elsif template.bytesize >= 51200
         upload_template(stack_path, template) do |template_url|
           @cf_client.validate_template(template_url: template_url)

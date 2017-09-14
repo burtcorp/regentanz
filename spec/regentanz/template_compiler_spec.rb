@@ -529,7 +529,7 @@ module Regentanz
 
       it 'raises a template error if the compiled template is larger than 460800 bytes' do
         dummy_template = "0" * 460801
-        expect { compiler.validate_template('stack', dummy_template) }.to raise_error(described_class::TemplateError, 'Compiled template is too large: 460801 bytes')
+        expect { compiler.validate_template('stack', dummy_template) }.to raise_error(described_class::TemplateError, 'Compiled template is too large: 460801 bytes > 460800')
       end
     end
   end
