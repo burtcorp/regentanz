@@ -1,2 +1,4 @@
+-I lib
+-r spec_helper
 --color
 --format doc

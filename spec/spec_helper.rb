@@ -1,3 +1,1 @@
 require 'regentanz'
-
-require 'tmpdir'

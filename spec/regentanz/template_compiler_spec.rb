@@ -1,6 +1,4 @@
-# encoding: utf-8
-
-require 'spec_helper'
+require 'tmpdir'
 
 module Regentanz
   module Resources
