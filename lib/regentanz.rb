@@ -7,4 +7,4 @@ module Regentanz
   Error = Class.new(StandardError)
 end
 
-require_relative 'regentanz/template_compiler'
+require 'regentanz/template_compiler'
