@@ -1,6 +1,3 @@
-#!/usr/bin/env ruby
-
-$LOAD_PATH << File.expand_path('../../lib', __FILE__)
 require 'regentanz'
 
 class Main
@@ -22,8 +19,4 @@ class Main
     $stderr.puts(e.message)
     1
   end
-end
-
-if File.identical?($0, __FILE__)
-  exit(Main.new.run(ARGV))
 end

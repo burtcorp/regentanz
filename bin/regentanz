@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+
+$LOAD_PATH << File.expand_path('../../lib', __FILE__)
+
+case ARGV.first
+when 'compare'
+  ARGV.shift
+  require 'regentanz/cli/compare'
+  exit(Main.new.run(ARGV))
+else
+  ARGV.shift if ARGV.first == 'compile'
+  require 'regentanz/cli/compile'
+  exit(Main.new.run(ARGV))
+end
