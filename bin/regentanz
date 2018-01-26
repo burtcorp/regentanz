@@ -6,9 +6,9 @@ case ARGV.first
 when 'compare'
   ARGV.shift
   require 'regentanz/cli/compare'
-  exit(Main.new.run(ARGV))
+  exit(Regentanz::Cli::Compare.new.run(ARGV))
 else
   ARGV.shift if ARGV.first == 'compile'
   require 'regentanz/cli/compile'
-  exit(Main.new.run(ARGV))
+  exit(Regentanz::Cli::Compile.new.run(ARGV))
 end
