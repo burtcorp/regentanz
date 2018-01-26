@@ -1,11 +1,15 @@
 require 'regentanz'
+require 'regentanz/cli/common'
 
 class Main
+  include Regentanz::Cli::Common
+
   def initialize
     @compiler = Regentanz::TemplateCompiler.new
   end
 
   def run(args)
+    load_config
     stack_path = args.first
     template = @compiler.compile_from_path(stack_path)
     template_json = JSON.pretty_generate(template)

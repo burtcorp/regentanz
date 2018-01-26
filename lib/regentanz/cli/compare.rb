@@ -1,4 +1,5 @@
 require 'regentanz'
+require 'regentanz/cli/common'
 
 class Diff
   def initialize(new_object, old_object)
@@ -12,12 +13,15 @@ class Diff
 end
 
 class Main
+  include Regentanz::Cli::Common
+
   def initialize
     @cf_client = Aws::CloudFormation::Client.new(region: region)
     @compiler = Regentanz::TemplateCompiler.new(cloud_formation_client: @cf_client)
   end
 
   def run(args)
+    load_config
     stack_name, stack_path, _ = *args
     new_template = @compiler.compile_from_path(stack_path)
     @compiler.validate_template(stack_path, new_template.to_json)
