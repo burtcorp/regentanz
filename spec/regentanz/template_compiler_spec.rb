@@ -324,6 +324,20 @@ module Regentanz
             expect(template).not_to include('Outputs')
           end
         end
+
+        context 'when the resource is not loaded' do
+          let :resources do
+            super().merge(
+              'core/unloaded_resource.json' => {
+                'Type' => 'Regentanz::Resources::Test::Unloaded',
+              }
+            )
+          end
+
+          it 'converts the resource type to a path and loads it' do
+            expect(template['Resources']).to include('CoreUnloadedResource')
+          end
+        end
       end
 
       context 'with an non-existant resource type' do

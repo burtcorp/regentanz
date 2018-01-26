@@ -142,10 +142,25 @@ module Regentanz
 
     def resource_compiler(type)
       @resource_compilers[type] ||= begin
-        type = type.split('::').reduce(Object, &:const_get).new
-      rescue NameError
-        raise Regentanz::Error, "No resource compiler for #{type}"
+        begin
+          create_instance(type)
+        rescue NameError
+          begin
+            load_resource_compiler(type)
+            create_instance(type)
+          rescue LoadError, NameError
+            raise Regentanz::Error, "No resource compiler for #{type}"
+          end
+        end
       end
+    end
+
+    def create_instance(type)
+      type.split('::').reduce(Object, &:const_get).new
+    end
+
+    def load_resource_compiler(type)
+      require(type.gsub('::', '/').gsub(/\B[A-Z]/, '_\&').downcase)
     end
 
     def compile_parameters(specifications)
