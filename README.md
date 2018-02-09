@@ -159,6 +159,81 @@ Properties:
   # …
 ```
 
+## Custom Resources
+
+If you've written a lot of CloudFormation templates you probably feel like you're constantly repeating yourself. The same patterns appear again and again in multiple templates. To help with this Regentanz lets you write custom resources that can be used in templates and that generate other resources, parameters, mappings, etc. when compiled.
+
+A custom resource is a Ruby class that lives in the `Regentanz::Resources` module that has a `#compile` method that returns a partial template.
+
+### Anatomy of a custom resource
+
+Custom resources will be instantiated by the template compiler and their `#compile` method will be called with the name of the resource and the properties. The result of this call must be a hash, with a `:resources` key, and optionally `:conditions`, `:mappings`, `:outputs`, and `:parameters`.
+
+Say you used a custom resource like the following, in a file with the relative path `app/sg.yml`
+
+```yaml
+Type: Regentanz::Resources::MySpecialSecurityGroup
+Properties:
+  Name: special-sg
+  PortsOpenToEveryone:
+    - 22
+    - 80
+```
+
+The compiler will, conceptually, do this:
+
+```ruby
+resource = Regentanz::Resources::MyCustomResource
+result = resource.compile('AppSg', {'Name' => 'special-sg', 'PortsOpenToEveryone' => [22, 80]})
+```
+
+It will then take the result and merge it with the rest of the template.
+
+This is how you could implement `MySpecialSecurityGroup`:
+
+```ruby
+class Regentanz::Resources::MyCustomResource
+  def compile(name, properties)
+    ingress_rules = properties['PortsOpenToEveryone'].map do |port|
+      {'IpProtocol' => 'tcp', 'FromPort' => port, 'ToPort' => port, 'CidrIp' => '0.0.0.0/0'}
+    end
+    {
+      :resources => {
+        name => {
+          'Type' => 'AWS::EC2::SecurityGroup',
+          'Properties' => {
+            'GroupName' => properties['Name'],
+            'SecurityGroupIngress' => ingress_rules
+          }
+        }
+      }
+    }
+  end
+end
+```
+
+You are free to ignore the `name` parameter, but it is strongly recommended that you use it. It is the name Regentanz has generated from the relative path of the file the resource is declared in, so ignoring it will make it harder and more confusing to refer to the resource the custom resource generates. If you generate more than one resource in your template it is recommended that you use `name` as a prefix. For example if you generate an auto scaling group and a launch configuration from the a custom resource generating resources with names like `"#{name}Asg"`, and `"#{name}Lc"` will make it possible to do `{ResolveRef: my_resource/asg}` in another resource.
+
+If the template fragment returned by `#compile` contains `ResolveRef` or `ResolveName` these will be resolved as expected.
+
+### Adding custom resources to the load path
+
+Custom resources must be available on the load path when the template compiler runs. The name of the file must also follow the standard Ruby naming convention, i.e. a resource called `Regentanz::Resources::MyCustomResource` must be declared in a file with the path `regentanz/resources/my_custom_resource.rb`, so that the compiler knows which file to load.
+
+This can be achieved by manipulating environment variables like `RUBYLIB`, or by packaging your custom resources as a gem, but in most cases the easiest way is to add a config file that tells the template compiler how to modify the load path to be able to load your custom resources.
+
+You can add a file called `.regentanz.yml` in any parent directory of the directory where you run the compiler. In the file you put a list of paths to add to the Ruby load path:
+
+```yaml
+load_path:
+  - path/to/resources
+  - /an/absolute/path
+```
+
+Relative paths will be resolved relative to the config file.
+
+The config file above will allow the template compiler to find custom resources in files such as `path/to/resources/regentanz/resources/my_custom_resource.rb` (relative to the config file) and `/an/absolute/path/regentanz/resources/my_custom_resource.rb`.
+
 ## Limitations
 
 Regentanz unfortunately does not support CloudFormation's YAML syntax for intrinsic functions.
