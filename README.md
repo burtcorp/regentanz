@@ -167,7 +167,7 @@ A custom resource is a Ruby class that lives in the `Regentanz::Resources` modul
 
 ### Anatomy of a custom resource
 
-Custom resources will be instantiated by the template compiler and their `#compile` method will be called with the name of the resource and the properties. The result of this call must be a hash, with a `:resources` key, and optionally `:conditions`, `:mappings`, `:outputs`, and `:parameters`.
+Custom resources will be instantiated by the template compiler and their `#compile` method will be called with the name of the resource and the resource template. The result of this call must be a "template fragment", which is a hash with a `:resources` key, and optionally `:conditions`, `:mappings`, `:outputs`, and `:parameters`. Each of these must be (when specified) a hash that looks like the corresponding CloudFormation structure
 
 Say you used a custom resource like the following, in a file with the relative path `app/sg.yml`
 
@@ -180,11 +180,11 @@ Properties:
     - 80
 ```
 
-The compiler will, conceptually, do this:
+The compiler will, conceptually, do this (`template_fragment` is a the contents of the file):
 
 ```ruby
 resource = Regentanz::Resources::MyCustomResource
-result = resource.compile('AppSg', {'Name' => 'special-sg', 'PortsOpenToEveryone' => [22, 80]})
+result = resource.compile('AppSg', template_fragment)
 ```
 
 It will then take the result and merge it with the rest of the template.
@@ -193,8 +193,8 @@ This is how you could implement `MySpecialSecurityGroup`:
 
 ```ruby
 class Regentanz::Resources::MyCustomResource
-  def compile(name, properties)
-    ingress_rules = properties['PortsOpenToEveryone'].map do |port|
+  def compile(name, template)
+    ingress_rules = template['Properties']['PortsOpenToEveryone'].map do |port|
       {'IpProtocol' => 'tcp', 'FromPort' => port, 'ToPort' => port, 'CidrIp' => '0.0.0.0/0'}
     end
     {
