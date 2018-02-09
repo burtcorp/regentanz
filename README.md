@@ -93,10 +93,17 @@ You can use JSON or YAML for your files, and mix between these in the same templ
 The contents of the files is the same thing you would put in a CloudFormation template. In other words, if your CloudFormation looks something like this:
 
 ```yaml
+Parameters:
+  ServerCount:
+    Type: Number
+    Default: 2
+    MinValue: 0
+
 Resources:
   Asg:
     Type: AWS::EC2::AutoScalingGroup
     Properties:
+      DesiredCapacity: !Ref ServerCount
       # …
   Lc:
     Type: AWS::EC2::LaunchConfiguration
@@ -104,15 +111,28 @@ Resources:
       # …
 ```
 
-You would put this in the file called `asg.yml`:
+You would put the parameters in `parameters.yml`:
+
+```yaml
+Parameters:
+  ServerCount:
+    Type: Number
+    Default: 2
+    MinValue: 0
+```
+
+The auto scaling group resource in `resources/asg.yml`:
 
 ```yaml
 Type: AWS::EC2::AutoScalingGroup
 Properties:
+  DesiredCapacity: {Ref: DesiredCapacity}
   # …
 ```
 
-and this in `lc.yml`:
+Unfortunately CloudFormation's YAML syntax for intrinsic functions (e.g. `!Ref`) is not supported, you have to convert it to YAML/JSON (e.g. `{Ref: …}`), like above.
+
+The launch configuration resource would go in a file called `resources/lc.yml`:
 
 ```yaml
 Type: AWS::EC2::LaunchConfiguration
@@ -120,7 +140,7 @@ Properties:
   # …
 ```
 
-And when you compile this with the Regentanz compiler you would get the same CloudFormation template back.
+And when you compile this with the Regentanz compiler you would get the same CloudFormation template back, but in JSON format.
 
 ### Resource references
 
