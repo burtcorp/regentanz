@@ -236,7 +236,8 @@ The config file above will allow the template compiler to find custom resources 
 
 ## Limitations
 
-Regentanz unfortunately does not support CloudFormation's YAML syntax for intrinsic functions.
+* Regentanz unfortunately does not support CloudFormation's YAML syntax for intrinsic functions.
+* The support for validating large templates is currently broken.
 
 # Copyright
 
