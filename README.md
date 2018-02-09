@@ -37,6 +37,8 @@ To compile a template you use the `regentanz` command like this:
 $ regentanz compile path/to/template > path/to/compiled/template.json
 ```
 
+The compiler will validate the final template with CloudFormation, so you will need to run it with AWS credentials that permit `cloudformation:ValidateTemplate`.
+
 ### Anatomy of a template
 
 Just like a CloudFormation template, a Regentanz template consists of conditions, mappings, outputs, parameters, and resources. In contrast with CloudFormation these are not properties of one big JSON or YAML document, but exists as separate files in a directory structure. Each resource has its own file, and there is one file each for conditions, mappings, and parameters. If the template doesn't need conditions, mappings, or parameters these files can be left out.
