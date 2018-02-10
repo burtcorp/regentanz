@@ -8,6 +8,8 @@ Regentanz is a compiler and preprocessor for CloudFormation templates. It allows
 
 ## Installation
 
+> _Please note that we haven't made the first release yet, and that there is another gem called "regentanz" already. We have asked the author of that gem if we can take over the name, and we will wait for that process to complete before releasing the first release._
+
 Install it on the command line:
 
 ```shell
