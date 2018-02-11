@@ -513,6 +513,38 @@ module Regentanz
         File.write('template/resources/attachment.yml', 'Type: AWS::EC2::VolumeAttachment')
         expect(template['Resources'].keys.sort).to eq(%w[Attachment CoreInstance])
       end
+
+      it 'handles short-form intrinsic functions in YAML' do
+        Dir.mkdir 'template/resources'
+        Dir.mkdir 'template/resources/core'
+        File.write('template/resources/core/instance.json', '{"Type":"AWS::EC2::Instance"}')
+        File.write('template/resources/volume.yml', <<-'YAML')
+        Type: AWS::EC2::Volume,
+        Properties:
+          Size: !ImportValue VolumeSize
+          AvailabilityZone: !GetAtt Instance.AvailabilityZone
+          Tags:
+            - Key: MyTag
+              Value: !Sub "${Volume}-${Volume}"
+        YAML
+        File.write('template/resources/attachment.yml', <<-'YAML')
+        Type: AWS::EC2::VolumeAttachment
+        Properties:
+          InstanceId: !ResolveRef core/instance
+          VolumeId: !Ref Volume
+          Device: !Join [/, ['', dev, sdh]]
+        YAML
+        expect(template['Resources']['Volume']['Properties']).to eq(
+          'Size' => {'Fn::ImportValue' => 'VolumeSize'},
+          'AvailabilityZone' => {'Fn::GetAtt' => ['Instance', 'AvailabilityZone']},
+          'Tags' => [{'Key' => 'MyTag', 'Value' => {'Fn::Sub' => '${Volume}-${Volume}'}}],
+        )
+        expect(template['Resources']['Attachment']['Properties']).to eq(
+          'InstanceId' => {'Ref' => 'CoreInstance'},
+          'VolumeId' => {'Ref' => 'Volume'},
+          'Device' => {'Fn::Join' => ['/', ['', 'dev', 'sdh']]},
+        )
+      end
     end
 
     describe '#validate_template' do
