@@ -6,20 +6,20 @@ _If you're reading this on GitHub, please note that this is the readme for the d
 
 Regentanz is a compiler and preprocessor for CloudFormation templates. It allows you to split up a template into one file per resource, and also build custom resources that can decrease the complexity of templates.
 
-## Installation
+> _Looking for Regentanz, Carsten Zimmermann's "Library to access the Google Weather API"? It can still be found at https://github.com/carpodaster/regentanz and if you install v0.3.3 from Rubygems, you'll get that gem._
 
-> _Please note that we haven't made the first release yet, and that there is another gem called "regentanz" already. We have asked the author of that gem if we can take over the name, and we will wait for that process to complete before releasing the first release._
+## Installation
 
 Install it on the command line:
 
 ```shell
-$ gem install regentanz
+$ gem install regentanz --version '~> 1.0.0'
 ```
 
 or add it to your `Gemfile`:
 
 ```ruby
-gem 'regentanz'
+gem 'regentanz', '~> 1.0.0'
 ```
 
 ## How to build and run the tests
