@@ -1,0 +1,5 @@
+Type: Regentanz::Resources::App
+Properties:
+  Name: super-duper
+  IamInstanceProfile: {ResolveRef: instance_profile}
+  VpcId: vpc-123

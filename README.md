@@ -31,6 +31,10 @@ $ bundle
 $ rake
 ```
 
+## Examples
+
+The `examples` directory contains runnable example templates.
+
 ## Usage
 
 To compile a template you use the `regentanz` command like this:

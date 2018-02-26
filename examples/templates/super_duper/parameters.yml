@@ -1,0 +1,8 @@
+Environment:
+  Label: Environment
+  Type: String
+  Default: production
+  AllowedValues:
+    - development
+    - staging
+    - production

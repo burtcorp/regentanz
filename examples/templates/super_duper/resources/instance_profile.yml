@@ -1,0 +1,5 @@
+Type: AWS::IAM::InstanceProfile
+Properties:
+  Path: '/'
+  Roles:
+    - {ResolveRef: role}
