@@ -6,11 +6,11 @@ module Regentanz
     CredentialsError = Class.new(Regentanz::Error)
     TemplateError = Class.new(Regentanz::Error)
 
-    def initialize(options = {})
+    def initialize(cloud_formation_client: nil, s3_client: nil)
       @resource_compilers = {}
       @region = ENV.fetch('AWS_REGION', 'eu-west-1')
-      @cf_client = options[:cloud_formation_client] || Aws::CloudFormation::Client.new(region: @region)
-      @s3_client = options[:s3_client] || Aws::S3::Resource.new(region: @region)
+      @cf_client = cloud_formation_client || Aws::CloudFormation::Client.new(region: @region)
+      @s3_client = s3_client || Aws::S3::Resource.new(region: @region)
     rescue Aws::Sigv4::Errors::MissingCredentialsError => e
       raise CredentialsError, 'Validation requires AWS credentials'
     end
@@ -61,13 +61,6 @@ module Regentanz
 
     TEMPLATE_VALIDATION_BUCKET = 'cf-templates-jn3m2hocei1o-%<region>s'
     TEMPLATE_VALIDATION_KEY = 'regentanz/%<stack>s-%<timestamp>s.json'
-    def upload_template(stack_path, template)
-      bucket = TEMPLATE_VALIDATION_BUCKET % {region: @region}
-      key = TEMPLATE_VALIDATION_KEY % {stack: stack_path.gsub('/', '_'), timestamp: Time.now.to_i}
-      obj = @s3_client.bucket(bucket).object(key)
-      obj.put(body: template)
-      yield obj.public_url
-    end
 
     private
 
@@ -79,6 +72,14 @@ module Regentanz
       'AWS::StackId',
       'AWS::StackName',
     ].map!(&:freeze).freeze
+
+    def upload_template(stack_path, template)
+      bucket = TEMPLATE_VALIDATION_BUCKET % {region: @region}
+      key = TEMPLATE_VALIDATION_KEY % {stack: stack_path.gsub('/', '_'), timestamp: Time.now.to_i}
+      obj = @s3_client.bucket(bucket).object(key)
+      obj.put(body: template)
+      yield obj.public_url
+    end
 
     def validate_parameter_use(template)
       available = {}

@@ -41,6 +41,10 @@ module Regentanz
       double(:s3)
     end
 
+    before do
+      allow(cf_client).to receive(:validate_template)
+    end
+
     describe '#compile_template' do
       let :resources do
         {
@@ -580,7 +584,6 @@ module Regentanz
 
     describe '#validate_template' do
       it 'uses the CloudFormation API to validate the template' do
-        allow(cf_client).to receive(:validate_template)
         compiler.validate_template('stack', 'my-template')
         expect(cf_client).to have_received(:validate_template).with(template_body: 'my-template')
       end
@@ -590,21 +593,63 @@ module Regentanz
         expect { compiler.validate_template('stack', 'my-template') }.to raise_error(described_class::ValidationError, 'Invalid template: boork')
       end
 
-      it 'uploads the template to s3 if the compiled template is larger than 51200 bytes' do
-        dummy_template = "0" * 51201
-        bucket = double(:bucket)
-        s3_obj = double(:s3_obj)
-        expect(s3_client).to receive(:bucket).and_return(bucket)
-        expect(bucket).to receive(:object).with(/regentanz\/stack-(\d+).json$/).and_return(s3_obj)
-        expect(s3_obj).to receive(:put).with(body: dummy_template)
-        expect(s3_obj).to receive(:public_url).and_return('s3-url')
-        expect(cf_client).to receive(:validate_template).with(template_url: 's3-url')
-        compiler.validate_template('stack', dummy_template)
+      context 'when the compiled template is larger than 51200 bytes' do
+        let :large_template do
+          '0' * 51201
+        end
+
+        let :bucket do
+          double(:bucket)
+        end
+
+        let :s3_obj do
+          double(:s3_obj)
+        end
+
+        before do
+          allow(s3_client).to receive(:bucket).and_return(bucket)
+          allow(bucket).to receive(:object).with(/regentanz\/stack-(\d+).json$/).and_return(s3_obj)
+          allow(s3_obj).to receive(:put)
+          allow(s3_obj).to receive(:public_url).and_return('s3-url')
+        end
+
+        it 'uploads the template to S3 before validating the template' do
+          compiler.validate_template('stack', large_template)
+          expect(s3_obj).to have_received(:put).with(body: large_template).ordered
+          expect(cf_client).to have_received(:validate_template).with(template_url: 's3-url').ordered
+        end
+
+        it 'uploads the template to a bucket in the default region' do
+          compiler.validate_template('stack', large_template)
+          expect(s3_client).to have_received(:bucket).with('cf-templates-jn3m2hocei1o-eu-west-1')
+        end
+
+        context 'when a region has been configured with the AWS_REGION environment variable' do
+          around do |example|
+            original_region = ENV['AWS_REGION']
+            ENV['AWS_REGION'] = 'ap-southeast-1'
+            begin
+              example.call
+            ensure
+              ENV['AWS_REGION'] = original_region
+            end
+          end
+
+          it 'uploads the template to a bucket in that region' do
+            compiler.validate_template('stack', large_template)
+            expect(s3_client).to have_received(:bucket).with('cf-templates-jn3m2hocei1o-ap-southeast-1')
+          end
+        end
       end
 
-      it 'raises a template error if the compiled template is larger than 460800 bytes' do
-        dummy_template = "0" * 460801
-        expect { compiler.validate_template('stack', dummy_template) }.to raise_error(described_class::TemplateError, 'Compiled template is too large: 460801 bytes > 460800')
+      context 'when the compiled template is larger than 460800 bytes' do
+        let :large_template do
+          '0' * 460801
+        end
+
+        it 'raises a template error' do
+          expect { compiler.validate_template('stack', large_template) }.to raise_error(described_class::TemplateError, 'Compiled template is too large: 460801 bytes > 460800')
+        end
       end
     end
   end
