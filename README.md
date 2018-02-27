@@ -43,7 +43,25 @@ To compile a template you use the `regentanz` command like this:
 $ regentanz compile path/to/template > path/to/compiled/template.json
 ```
 
+### Template validation
+
 The compiler will validate the final template with CloudFormation, so you will need to run it with AWS credentials that permit `cloudformation:ValidateTemplate`.
+
+For the validation to work with templates larger than 51200 bytes you need to specify an S3 bucket in a config file, and need AWS credentials that permit `s3:PutObject` in that bucket.
+
+To configure a bucket to use for validation of large templates create a file called `.regentanz.yml` in the directory where you will run Regentanz, and add the following:
+
+```yaml
+template_url: 's3://some-bucket-name/a_prefix/${TEMPLATE_NAME}.json'
+```
+
+You can use `${AWS_REGION}` in the bucket portion, and `${TEMPLATE_NAME}` and `${TIMESTAMP}` in the key portion to create unique URLs. You can, for example, use the buckets that CloudFormation creates for template uploads, like this:
+
+```yaml
+template_url: 's3://cf-templates-xyz-${AWS_REGION}/regentanz/${TEMPLATE_NAME}-${TIMESTAMP}.json'
+```
+
+Where "xyz" is the unique letter combination for your account.
 
 ### Anatomy of a template
 

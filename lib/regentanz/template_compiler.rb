@@ -9,6 +9,7 @@ module Regentanz
     def initialize(config, cloud_formation_client: nil, s3_client: nil)
       @resource_compilers = {}
       @region = config['default_region']
+      @template_url = config['template_url']
       @cf_client = cloud_formation_client || Aws::CloudFormation::Client.new(region: @region)
       @s3_client = s3_client || Aws::S3::Resource.new(region: @region)
     rescue Aws::Sigv4::Errors::MissingCredentialsError => e
@@ -49,18 +50,14 @@ module Regentanz
       if template.bytesize > 460800
         raise TemplateError, "Compiled template is too large: #{template.bytesize} bytes > 460800"
       elsif template.bytesize >= 51200
-        upload_template(stack_path, template) do |template_url|
-          @cf_client.validate_template(template_url: template_url)
-        end
+        template_url = upload_template(stack_path, template)
+        @cf_client.validate_template(template_url: template_url)
       else
         @cf_client.validate_template(template_body: template)
       end
     rescue Aws::CloudFormation::Errors::ValidationError => e
       raise ValidationError, "Invalid template: #{e.message}", e.backtrace
     end
-
-    TEMPLATE_VALIDATION_BUCKET = 'cf-templates-jn3m2hocei1o-%<region>s'
-    TEMPLATE_VALIDATION_KEY = 'regentanz/%<stack>s-%<timestamp>s.json'
 
     private
 
@@ -74,11 +71,22 @@ module Regentanz
     ].map!(&:freeze).freeze
 
     def upload_template(stack_path, template)
-      bucket = TEMPLATE_VALIDATION_BUCKET % {region: @region}
-      key = TEMPLATE_VALIDATION_KEY % {stack: stack_path.gsub('/', '_'), timestamp: Time.now.to_i}
-      obj = @s3_client.bucket(bucket).object(key)
-      obj.put(body: template)
-      yield obj.public_url
+      if @template_url
+        if (captures = @template_url.match(%r{\As3://(?<bucket>[^/]+)/(?<key>.+)\z}))
+          bucket = captures[:bucket]
+          bucket = bucket.sub('${AWS_REGION}', @region)
+          key = captures[:key]
+          key = key.sub('${TEMPLATE_NAME}', File.basename(stack_path))
+          key = key.sub('${TIMESTAMP}', Time.now.to_i.to_s)
+          obj = @s3_client.bucket(bucket).object(key)
+          obj.put(body: template)
+          obj.public_url
+        else
+          raise ValidationError, format('Malformed template URL: %p', @template_url)
+        end
+      else
+        raise ValidationError, 'Unable to validate template: it is larger than 51200 bytes and no template URL has been configured'
+      end
     end
 
     def validate_parameter_use(template)

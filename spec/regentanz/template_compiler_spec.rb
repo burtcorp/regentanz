@@ -600,6 +600,10 @@ module Regentanz
       end
 
       context 'when the compiled template is larger than 51200 bytes' do
+        let :config do
+          super().merge('template_url' => 's3://templates/validate-me.json')
+        end
+
         let :large_template do
           '0' * 51201
         end
@@ -613,21 +617,64 @@ module Regentanz
         end
 
         before do
-          allow(s3_client).to receive(:bucket).and_return(bucket)
-          allow(bucket).to receive(:object).with(/regentanz\/stack-(\d+).json$/).and_return(s3_obj)
+          allow(s3_client).to receive(:bucket).with('templates').and_return(bucket)
+          allow(bucket).to receive(:object).with('validate-me.json').and_return(s3_obj)
           allow(s3_obj).to receive(:put)
-          allow(s3_obj).to receive(:public_url).and_return('s3-url')
+          allow(s3_obj).to receive(:public_url).and_return('https://s3.amazonaws.com/templates/validate-me.json')
         end
 
         it 'uploads the template to S3 before validating the template' do
           compiler.validate_template('stack', large_template)
           expect(s3_obj).to have_received(:put).with(body: large_template).ordered
-          expect(cf_client).to have_received(:validate_template).with(template_url: 's3-url').ordered
+          expect(cf_client).to have_received(:validate_template).with(template_url: 'https://s3.amazonaws.com/templates/validate-me.json').ordered
         end
 
-        it 'uploads the template to a bucket in the configured region' do
-          compiler.validate_template('stack', large_template)
-          expect(s3_client).to have_received(:bucket).with('cf-templates-jn3m2hocei1o-ap-southeast-1')
+        context 'and the template URL contains variables' do
+          let :config do
+            super().merge('template_url' => 's3://templates-${AWS_REGION}/some/prefix/${TEMPLATE_NAME}-${TIMESTAMP}.json')
+          end
+
+          before do
+            allow(s3_client).to receive(:bucket).and_return(bucket)
+            allow(bucket).to receive(:object).and_return(s3_obj)
+          end
+
+          it 'replaces ${AWS_REGION} in the bucket name with the configured AWS region' do
+            compiler.validate_template('stack', large_template)
+            expect(s3_client).to have_received(:bucket).with('templates-ap-southeast-1')
+          end
+
+          it 'replaces ${TEMPLATE_NAME} in the key with the directory name of the template' do
+            compiler.validate_template('some/path/to/a/template/called/foobar', large_template)
+            expect(bucket).to have_received(:object).with(start_with('some/prefix/foobar-'))
+          end
+
+          it 'replaces ${TIMESTAMP} in the key with current time as a UNIX timestamp' do
+            compiler.validate_template('some/path/to/a/template/called/foobar', large_template)
+            expect(bucket).to have_received(:object).with(/-\d+\.json$/)
+          end
+        end
+
+        context 'and the template URL is malformed' do
+          let :config do
+            super().merge('template_url' => 's5://templates-${AWS_REGION}/some/prefix/${TEMPLATE_NAME}-${TIMESTAMP}.json')
+          end
+
+          it 'raises an error' do
+            expect { compiler.validate_template('stack', large_template) }.to raise_error(described_class::ValidationError, 'Malformed template URL: "s5://templates-${AWS_REGION}/some/prefix/${TEMPLATE_NAME}-${TIMESTAMP}.json"')
+          end
+        end
+
+        context 'and no template bucket has been specified' do
+          let :config do
+            super().tap do |c|
+              c.delete('template_url')
+            end
+          end
+
+          it 'raises an error' do
+            expect { compiler.validate_template('stack', large_template) }.to raise_error(described_class::ValidationError, 'Unable to validate template: it is larger than 51200 bytes and no template URL has been configured')
+          end
         end
       end
 
