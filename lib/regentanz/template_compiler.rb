@@ -6,9 +6,9 @@ module Regentanz
     CredentialsError = Class.new(Regentanz::Error)
     TemplateError = Class.new(Regentanz::Error)
 
-    def initialize(cloud_formation_client: nil, s3_client: nil)
+    def initialize(config, cloud_formation_client: nil, s3_client: nil)
       @resource_compilers = {}
-      @region = ENV.fetch('AWS_REGION', 'eu-west-1')
+      @region = config['default_region']
       @cf_client = cloud_formation_client || Aws::CloudFormation::Client.new(region: @region)
       @s3_client = s3_client || Aws::S3::Resource.new(region: @region)
     rescue Aws::Sigv4::Errors::MissingCredentialsError => e

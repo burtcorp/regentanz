@@ -13,6 +13,10 @@ module Regentanz
               $LOAD_PATH << File.absolute_path(extra_load_path, File.dirname(path))
             end
           end
+          if config['default_region'].nil? && (region = ENV['AWS_REGION'] || ENV['AWS_DEFAULT_REGION'])
+            config['default_region'] = region
+          end
+          config
         end
       end
 

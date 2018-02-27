@@ -30,7 +30,13 @@ module Regentanz
 
   describe TemplateCompiler do
     let :compiler do
-      described_class.new(cloud_formation_client: cf_client, s3_client: s3_client)
+      described_class.new(config, cloud_formation_client: cf_client, s3_client: s3_client)
+    end
+
+    let :config do
+      {
+        'default_region' => 'ap-southeast-1',
+      }
     end
 
     let :cf_client do
@@ -619,26 +625,9 @@ module Regentanz
           expect(cf_client).to have_received(:validate_template).with(template_url: 's3-url').ordered
         end
 
-        it 'uploads the template to a bucket in the default region' do
+        it 'uploads the template to a bucket in the configured region' do
           compiler.validate_template('stack', large_template)
-          expect(s3_client).to have_received(:bucket).with('cf-templates-jn3m2hocei1o-eu-west-1')
-        end
-
-        context 'when a region has been configured with the AWS_REGION environment variable' do
-          around do |example|
-            original_region = ENV['AWS_REGION']
-            ENV['AWS_REGION'] = 'ap-southeast-1'
-            begin
-              example.call
-            ensure
-              ENV['AWS_REGION'] = original_region
-            end
-          end
-
-          it 'uploads the template to a bucket in that region' do
-            compiler.validate_template('stack', large_template)
-            expect(s3_client).to have_received(:bucket).with('cf-templates-jn3m2hocei1o-ap-southeast-1')
-          end
+          expect(s3_client).to have_received(:bucket).with('cf-templates-jn3m2hocei1o-ap-southeast-1')
         end
       end
 
