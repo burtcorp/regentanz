@@ -2,6 +2,8 @@
 
 $LOAD_PATH << File.expand_path('../../lib', __FILE__)
 
+require 'regentanz/yaml-ext'
+
 case ARGV.first
 when 'compare'
   ARGV.shift
