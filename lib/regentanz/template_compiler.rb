@@ -24,8 +24,8 @@ module Regentanz
         options[:conditions] = load_top_level_file('conditions')
         options[:outputs] = load_top_level_file('outputs')
         resources = load_resources
+        compile_template(resources, options)
       end
-      compile_template(resources, options)
     end
 
     def compile_template(resources, options = {})
