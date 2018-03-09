@@ -153,6 +153,37 @@ module Regentanz
         )
       end
 
+      it 'reads external files in resource definitions' do
+        Dir.mktmpdir do |dir|
+          Dir.chdir(dir) do
+            File.open('code.py', 'w') do |file|
+              file.puts 'Some code 1'
+              file.puts 'Some code 2'
+            end
+
+            resources['extra'] = {
+              'Type' => 'AWS::Lambda::Function',
+              'Properties' => {
+                'Code' => {
+                  'ZipFile' => {'Regentanz::ReadFile' => 'code.py'}
+                }
+              }
+            }
+
+            template = compiler.compile_template(resources, parameters: parameters, mappings: mappings, conditions: conditions, outputs: outputs, stack_path: dir)
+
+            expect(template['Resources']['Extra']).to eq(
+              'Type' => 'AWS::Lambda::Function',
+              'Properties' => {
+                'Code' => {
+                  'ZipFile' => "Some code 1\nSome code 2\n"
+                }
+              }
+            )
+          end
+        end
+      end
+
       context 'with parameter labels' do
         it 'removes the Label key from parameters' do
           parameters['MinInstances']['Label'] = 'The X'

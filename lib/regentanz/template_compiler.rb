@@ -227,6 +227,8 @@ module Regentanz
           expanded_resource
         elsif (reference = resource['ResolveName'])
           relative_path_to_name(reference)
+        elsif (reference = resource['Regentanz::ReadFile'])
+          read_file(reference)
         else
           resource.merge(resource) do |_, v, _|
             expand_refs(v)
@@ -238,6 +240,14 @@ module Regentanz
         end
       else
         resource
+      end
+    end
+
+    def read_file(filename)
+      if File.exists?(filename)
+        File.read(filename)
+      else
+        raise ParseError, "File #{filename} does not exist"
       end
     end
   end
