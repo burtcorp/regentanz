@@ -24,8 +24,8 @@ module Regentanz
         options[:conditions] = load_top_level_file('conditions')
         options[:outputs] = load_top_level_file('outputs')
         resources = load_resources
+        compile_template(resources, options)
       end
-      compile_template(resources, options)
     end
 
     def compile_template(resources, options = {})
@@ -227,6 +227,8 @@ module Regentanz
           expanded_resource
         elsif (reference = resource['ResolveName'])
           relative_path_to_name(reference)
+        elsif (reference = resource['Regentanz::ReadFile'])
+          read_file(reference)
         else
           resource.merge(resource) do |_, v, _|
             expand_refs(v)
@@ -238,6 +240,14 @@ module Regentanz
         end
       else
         resource
+      end
+    end
+
+    def read_file(filename)
+      if File.exists?(filename)
+        File.read(filename)
+      else
+        raise ParseError, "File #{filename} does not exist"
       end
     end
   end
