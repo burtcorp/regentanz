@@ -74,10 +74,10 @@ module Regentanz
       if @template_url
         if (captures = @template_url.match(%r{\As3://(?<bucket>[^/]+)/(?<key>.+)\z}))
           bucket = captures[:bucket]
-          bucket = bucket.sub('${AWS_REGION}', @region)
+          bucket = bucket.gsub('${AWS_REGION}', @region)
           key = captures[:key]
-          key = key.sub('${TEMPLATE_NAME}', File.basename(stack_path))
-          key = key.sub('${TIMESTAMP}', Time.now.to_i.to_s)
+          key = key.gsub('${TEMPLATE_NAME}', File.basename(stack_path))
+          key = key.gsub('${TIMESTAMP}', Time.now.to_i.to_s)
           obj = @s3_client.bucket(bucket).object(key)
           obj.put(body: template)
           obj.public_url

@@ -631,7 +631,7 @@ module Regentanz
 
         context 'and the template URL contains variables' do
           let :config do
-            super().merge('template_url' => 's3://templates-${AWS_REGION}/some/prefix/${TEMPLATE_NAME}-${TIMESTAMP}.json')
+            super().merge('template_url' => 's3://templates-${AWS_REGION}/some/prefix/${TEMPLATE_NAME}/${TEMPLATE_NAME}-${TIMESTAMP}.json')
           end
 
           before do
@@ -646,7 +646,7 @@ module Regentanz
 
           it 'replaces ${TEMPLATE_NAME} in the key with the directory name of the template' do
             compiler.validate_template('some/path/to/a/template/called/foobar', large_template)
-            expect(bucket).to have_received(:object).with(start_with('some/prefix/foobar-'))
+            expect(bucket).to have_received(:object).with(start_with('some/prefix/foobar/foobar-'))
           end
 
           it 'replaces ${TIMESTAMP} in the key with current time as a UNIX timestamp' do
