@@ -1,2 +1,3 @@
 load_path:
   - lib
+default_region: us-east-1
