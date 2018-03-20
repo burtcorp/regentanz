@@ -17,17 +17,13 @@ module Regentanz
     class Compare
       include Common
 
-      def initialize
-        @cf_client = Aws::CloudFormation::Client.new(region: region)
-        @compiler = Regentanz::TemplateCompiler.new(cloud_formation_client: @cf_client)
-      end
-
       def run(args)
-        load_config
+        config = load_config
         stack_name, stack_path, _ = *args
-        new_template = @compiler.compile_from_path(stack_path)
-        @compiler.validate_template(stack_path, new_template.to_json)
-        old_template = get_template(stack_name)
+        compiler = TemplateCompiler.new(config)
+        new_template = compiler.compile_from_path(stack_path)
+        compiler.validate_template(stack_path, new_template.to_json)
+        old_template = get_template(config, stack_name)
         diff = compare(new_template, old_template)
         if diff.to_json != new_template.to_json
           output = JSON.pretty_generate(diff)
@@ -43,12 +39,9 @@ module Regentanz
 
       private
 
-      def region
-        ENV['AWS_REGION'] || ENV['AWS_DEFAULT_REGION'] || 'eu-west-1'
-      end
-
-      def get_template(stack_name)
-        YAML.load(@cf_client.get_template(stack_name: stack_name)[:template_body])
+      def get_template(config, stack_name)
+        cf_client = Aws::CloudFormation::Client.new(region: config['default_region'])
+        YAML.load(cf_client.get_template(stack_name: stack_name)[:template_body])
       rescue Aws::Errors::MissingCredentialsError => e
         raise Regentanz::Error, 'Retrieving template requires AWS credentials', e.backtrace
       end

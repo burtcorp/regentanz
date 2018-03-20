@@ -10,7 +10,7 @@ Use the `compile` command to compile the `super_duper` template into CloudFormat
 $ ../bin/regentanz compile templates/super_duper > build/super_duper.json
 ```
 
-The compiler uses the CloudFormation API to validate the template so you will need to either have the `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables set, or any of the other standard ways of configuring the AWS SDK with credentials.
+The compiler uses the CloudFormation API to validate the template so you will need to either have the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` environment variables set, or any of the other standard ways of configuring the AWS SDK with credentials.
 
 ### Template contents
 
