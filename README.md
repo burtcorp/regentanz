@@ -98,6 +98,7 @@ my_application/
 
 If you have conditions, mappings, outputs, or parameters you put these in files at the top level:
 
+```
 my_application/
   resources/
     iam/
