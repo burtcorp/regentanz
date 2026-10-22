@@ -253,7 +253,7 @@ module Regentanz
     end
 
     def read_file(filename)
-      if File.exists?(filename)
+      if File.exist?(filename)
         File.read(filename)
       else
         raise ParseError, "File #{filename} does not exist"

@@ -194,6 +194,23 @@ module Regentanz
         end
       end
 
+      it 'raises an error when an external file does not exist' do
+        Dir.mktmpdir do |dir|
+          Dir.chdir(dir) do
+            resources['extra'] = {
+              'Type' => 'AWS::Lambda::Function',
+              'Properties' => {
+                'Code' => {
+                  'ZipFile' => {'Regentanz::ReadFile' => 'missing.py'}
+                }
+              }
+            }
+
+            expect { compiler.compile_template(resources, parameters: parameters) }.to raise_error(described_class::ParseError, 'File missing.py does not exist')
+          end
+        end
+      end
+
       context 'with parameter labels' do
         it 'removes the Label key from parameters' do
           parameters['MinInstances']['Label'] = 'The X'
